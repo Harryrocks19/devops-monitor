@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DevOps Monitor</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<h2>System Metrics Dashboard 🚀</h2>
+
+<canvas id="cpuChart" width="400" height="200"></canvas>
+
+<script>
+async function fetchData() {
+    const res = await fetch("http://127.0.0.1:8000/metrics");
+    const data = await res.json();
+    return data.data.cpu_usage;
+}
+
+const ctx = document.getElementById('cpuChart').getContext('2d');
+
+const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [{
+            label: 'CPU Usage',
+            data: [],
+        }]
+    }
+});
+
+setInterval(async () => {
+    const cpu = await fetchData();
+
+    chart.data.labels.push(new Date().toLocaleTimeString());
+    chart.data.datasets[0].data.push(cpu);
+
+    chart.update();
+}, 2000);
+</script>
+
+</body>
+</html>
