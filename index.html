@@ -1,43 +1,221 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>DevOps Monitor</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DevOps Monitor 🚀</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0f1117;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', sans-serif;
+      padding: 24px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.8rem;
+      margin-bottom: 8px;
+      color: #ffffff;
+    }
+
+    #status-bar {
+      text-align: center;
+      font-size: 0.85rem;
+      color: #888;
+      margin-bottom: 16px;
+    }
+
+    #alert-banner {
+      display: none;
+      background: #ff4d4d22;
+      border: 1px solid #ff4d4d;
+      color: #ff6b6b;
+      text-align: center;
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-weight: bold;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .stat-card {
+      background: #1a1d27;
+      border: 1px solid #2a2d3a;
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .stat-card .label {
+      font-size: 0.8rem;
+      color: #888;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .stat-card .value {
+      font-size: 2rem;
+      font-weight: bold;
+    }
+
+    .cpu-val  { color: #4fc3f7; }
+    .ram-val  { color: #81c784; }
+    .disk-val { color: #ffb74d; }
+    .net-val  { color: #ce93d8; font-size: 1.1rem !important; }
+
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 20px;
+    }
+
+    .chart-card {
+      background: #1a1d27;
+      border: 1px solid #2a2d3a;
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .chart-card h3 {
+      font-size: 0.95rem;
+      color: #aaa;
+      margin-bottom: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+  </style>
 </head>
 <body>
 
-<h2>System Metrics Dashboard 🚀</h2>
+  <h1>🖥️ DevOps Monitor</h1>
+  <div id="status-bar">Connecting...</div>
+  <div id="alert-banner"></div>
 
-<canvas id="cpuChart" width="400" height="200"></canvas>
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="label">CPU Usage</div>
+      <div class="value cpu-val" id="cpu-val">--%</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">RAM Usage</div>
+      <div class="value ram-val" id="ram-val">--%</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Disk Usage</div>
+      <div class="value disk-val" id="disk-val">--%</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Network Sent</div>
+      <div class="value net-val" id="net-val">-- MB</div>
+    </div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h3>📈 CPU Usage %</h3>
+      <canvas id="cpuChart"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>📈 RAM Usage %</h3>
+      <canvas id="ramChart"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>📈 Disk Usage %</h3>
+      <canvas id="diskChart"></canvas>
+    </div>
+  </div>
 
 <script>
-async function fetchData() {
-    const res = await fetch("http://127.0.0.1:8000/metrics");
-    const data = await res.json();
-    return data.data.cpu_usage;
-}
+  const MAX_POINTS = 20;
 
-const ctx = document.getElementById('cpuChart').getContext('2d');
-
-const chart = new Chart(ctx, {
-    type: 'line',
-    data: {
+  function makeChart(id, label, color) {
+    return new Chart(document.getElementById(id).getContext('2d'), {
+      type: 'line',
+      data: {
         labels: [],
         datasets: [{
-            label: 'CPU Usage',
-            data: [],
+          label,
+          data: [],
+          borderColor: color,
+          backgroundColor: color + '22',
+          borderWidth: 2,
+          pointRadius: 2,
+          tension: 0.4,
+          fill: true,
         }]
+      },
+      options: {
+        animation: false,
+        scales: {
+          y: {
+            min: 0, max: 100,
+            ticks: { color: '#888', callback: v => v + '%' },
+            grid: { color: '#2a2d3a' }
+          },
+          x: { ticks: { color: '#888' }, grid: { color: '#2a2d3a' } }
+        },
+        plugins: { legend: { labels: { color: '#ccc' } } }
+      }
+    });
+  }
+
+  const cpuChart  = makeChart('cpuChart',  'CPU %',  '#4fc3f7');
+  const ramChart  = makeChart('ramChart',  'RAM %',  '#81c784');
+  const diskChart = makeChart('diskChart', 'Disk %', '#ffb74d');
+
+  function pushData(chart, label, value) {
+    chart.data.labels.push(label);
+    chart.data.datasets[0].data.push(value);
+    if (chart.data.labels.length > MAX_POINTS) {
+      chart.data.labels.shift();
+      chart.data.datasets[0].data.shift();
     }
-});
-
-setInterval(async () => {
-    const cpu = await fetchData();
-
-    chart.data.labels.push(new Date().toLocaleTimeString());
-    chart.data.datasets[0].data.push(cpu);
-
     chart.update();
-}, 2000);
+  }
+
+  async function fetchMetrics() {
+    try {
+      const res  = await fetch('/metrics');
+      const json = await res.json();
+      const d    = json.data;
+      const time = new Date().toLocaleTimeString();
+
+      document.getElementById('cpu-val').textContent  = d.cpu_usage.toFixed(1)  + '%';
+      document.getElementById('ram-val').textContent  = d.ram_usage.toFixed(1)  + '%';
+      document.getElementById('disk-val').textContent = d.disk_usage.toFixed(1) + '%';
+      document.getElementById('net-val').textContent  = (d.net_bytes_sent / 1048576).toFixed(1) + ' MB';
+
+      pushData(cpuChart,  time, d.cpu_usage);
+      pushData(ramChart,  time, d.ram_usage);
+      pushData(diskChart, time, d.disk_usage);
+
+      const banner = document.getElementById('alert-banner');
+      if (json.alert) {
+        banner.textContent = json.alert;
+        banner.style.display = 'block';
+      } else {
+        banner.style.display = 'none';
+      }
+
+      document.getElementById('status-bar').textContent = '🟢 Live — Last updated: ' + time;
+    } catch (e) {
+      document.getElementById('status-bar').textContent = '🔴 Connection lost — retrying...';
+    }
+  }
+
+  fetchMetrics();
+  setInterval(fetchMetrics, 3000);
 </script>
 
 </body>
